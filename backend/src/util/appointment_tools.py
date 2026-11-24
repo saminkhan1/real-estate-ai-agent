@@ -1,4 +1,5 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import os
 import logging
 from typing import List, Dict, Optional, Any
@@ -380,7 +381,6 @@ def get_freebusy_info(
 
 @tool
 def is_available_for_meeting(
-    service: Any,
     calendar_id: str,
     start_time: datetime,
     end_time: datetime,
@@ -390,7 +390,6 @@ def is_available_for_meeting(
     Checks if the user is available for a meeting within the given time range.
 
     Args:
-        service (Any): Authorized Calendar API service instance.
         calendar_id (str): The ID of the calendar to check.
         start_time (datetime): The start time of the proposed meeting.
         end_time (datetime): The end time of the proposed meeting.
@@ -399,17 +398,28 @@ def is_available_for_meeting(
     Returns:
         bool: True if the user is available, False otherwise.
     """
+    if isinstance(start_time, str):
+        start_time = datetime.fromisoformat(start_time)
+    if isinstance(end_time, str):
+        end_time = datetime.fromisoformat(end_time)
+
+    tz = ZoneInfo(time_zone)
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=tz)
+    if end_time.tzinfo is None:
+        end_time = end_time.replace(tzinfo=tz)
+
     # Convert datetime objects to RFC3339 format
     time_min = start_time.isoformat()
     time_max = end_time.isoformat()
 
     # Get free/busy information
-    freebusy_info = get_freebusy_info(
-        service, [calendar_id], time_min, time_max, time_zone
+    freebusy_info = get_freebusy_info.func(
+        [calendar_id], time_min, time_max, time_zone
     )
 
     # Check for conflicts
-    for calendar_id, calendar_info in freebusy_info.items():
+    for cal_id, calendar_info in freebusy_info.items():
         busy_times = calendar_info.get("busy", [])
         for busy_period in busy_times:
             busy_start = datetime.fromisoformat(busy_period["start"].replace("Z", "+00:00"))
